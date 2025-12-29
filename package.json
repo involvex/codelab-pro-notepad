@@ -3,6 +3,11 @@
   "version": "1.0.7",
   "description": "Production-ready, extensible code editor with plugin system and custom themes",
   "main": "dist/index.js",
+  "funding": "https://paypal.me/involvex",
+  "sponsor": {
+    "github": "https://github.com/sponsors/involvex",
+    "paypal": "https://paypal.me/involvex"
+  },
   "homepage": "https://github.com/involvex/codelab-pro-notepad#readme",
   "bugs": {
     "url": "https://github.com/involvex/codelab-pro-notepad/issues"
@@ -13,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/involvex/codelab-pro-notepad.git"
+    "url": "git+https://github.com/involvex/codelab-pro-notepad.git"
   },
   "bin": {
     "codelab": "bin/codelab.js"
@@ -30,7 +35,8 @@
     "LICENSE",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
-    "USAGE.md"
+    "USAGE.md",
+    ".github/FUNDING.yml"
   ],
   "scripts": {
     "dev": "bun run --hot --watch src/dev-server.tsx",
