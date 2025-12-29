@@ -1,6 +1,6 @@
 {
   "name": "codelab-pro-notepad",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Production-ready, extensible code editor with plugin system and custom themes",
   "repository": {
     "type": "git",
