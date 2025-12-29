@@ -5,6 +5,49 @@ All notable changes to CodeLab Pro Notepad will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2024-12-29
+
+### Added
+- **Extensions Management Panel** - Dedicated UI for managing plugins
+  - List all installed plugins with metadata
+  - Uninstall plugins
+  - Install Extension button opens installer modal
+  - Create Sample Extension feature with downloadable template
+- **Extension Installer** - Install plugins from multiple sources
+  - Local file upload (.js files)
+  - GitHub raw URLs
+  - NPM packages via unpkg.com CDN
+  - Security warnings about untrusted code
+  - Plugin validation and localStorage persistence
+- **Right-Click Context Menu** - Enhanced editing with context menu
+  - Cut, Copy, Paste, Select All, Format
+  - Theme-aware styling with glass morphism
+  - Click-outside-to-close functionality
+- **Export as HTML** - Export code with syntax highlighting
+  - Generates HTML with theme-aware colors
+  - Inline styles for portability
+  - File metadata header
+  - Added to File menu and Command Palette
+- **Status Bar Configuration** - Customize status bar visibility
+  - Toggle 8 individual items (language, line count, char count, git, theme, encoding, line ending, plugins)
+  - Settings persist to localStorage
+  - New Status Bar category in Settings Panel
+
+### Fixed
+- **About Section** - Completely redesigned and fixed
+  - Removed broken `import("../package.json")` Promise
+  - Proper info display with version, author, license, repository
+  - Styled info cards instead of broken text inputs
+- **Command Palette** - Fixed empty Change Theme command
+  - Cycles through available themes
+  - Added 3 new commands: Export HTML, Open Extensions, Install Extension
+- **Extensions Menu** - Now opens dedicated Extensions Panel instead of Settings
+
+### Changed
+- Enhanced editor from 1,766 to 2,819 lines (+1,053 lines of new features)
+- Bundle size: 420KB → 440KB (reasonable increase for major features)
+- Version bumped to 1.0.6
+
 ## [1.0.5] - 2024-12-29
 
 ### Fixed

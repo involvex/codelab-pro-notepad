@@ -396,6 +396,30 @@ const EnhancedCodeEditor: React.FC = () => {
   const [splitView, setSplitView] = useState(false);
   const [secondaryTabId, setSecondaryTabId] = useState<number | null>(null);
   const [commandSearch, setCommandSearch] = useState("");
+  const [showExtensionsPanel, setShowExtensionsPanel] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    visible: boolean;
+  } | null>(null);
+  const [statusBarConfig, setStatusBarConfig] = useState({
+    showLanguage: true,
+    showLineCount: true,
+    showCharCount: true,
+    showGitBranch: true,
+    showTheme: true,
+    showEncoding: true,
+    showLineEnding: true,
+    showCustomItems: true,
+  });
+  const [installedPlugins, setInstalledPlugins] = useState<{
+    [pluginId: string]: {
+      code: string;
+      enabled: boolean;
+      installedAt: string;
+    };
+  }>({});
+  const [showExtensionInstaller, setShowExtensionInstaller] = useState(false);
 
   // Refs
   const editorRef = useRef<HTMLDivElement>(null);
@@ -485,6 +509,53 @@ const EnhancedCodeEditor: React.FC = () => {
 
     pluginManagerRef.current.registerPlugin(prettierPlugin);
   }, [pluginAPI]);
+
+  // Load status bar config from localStorage
+  useEffect(() => {
+    const savedConfig = localStorage.getItem("codelab-statusbar-config");
+    if (savedConfig) {
+      try {
+        setStatusBarConfig(JSON.parse(savedConfig));
+      } catch (e) {
+        console.error("Failed to load status bar config", e);
+      }
+    }
+  }, []);
+
+  // Save status bar config to localStorage
+  useEffect(() => {
+    localStorage.setItem("codelab-statusbar-config", JSON.stringify(statusBarConfig));
+  }, [statusBarConfig]);
+
+  // Load installed plugins from localStorage
+  useEffect(() => {
+    const savedPlugins = localStorage.getItem("codelab-plugins");
+    if (savedPlugins && pluginManagerRef.current) {
+      try {
+        const plugins = JSON.parse(savedPlugins);
+        setInstalledPlugins(plugins);
+
+        // Install each saved plugin
+        Object.entries(plugins).forEach(([pluginId, data]: [string, any]) => {
+          if (data.enabled && data.code) {
+            try {
+              const func = new Function("exports", "module", data.code);
+              const module: any = { exports: {} };
+              func(module.exports, module);
+              const plugin = module.exports.default || module.exports;
+              if (plugin.id && plugin.activate) {
+                pluginManagerRef.current?.registerPlugin(plugin);
+              }
+            } catch (e) {
+              console.error(`Failed to load plugin ${pluginId}`, e);
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Failed to load plugins", e);
+      }
+    }
+  }, []);
 
   // ==================== NOTIFICATION SYSTEM ====================
   const showNotification = useCallback(
@@ -593,6 +664,96 @@ const EnhancedCodeEditor: React.FC = () => {
     );
     showNotification(`Saved ${activeTab.name}`, "success");
   }, [activeTab, activeTabId, showNotification]);
+
+  // ==================== EXPORT AS HTML ====================
+  const exportAsHTML = useCallback(() => {
+    if (!activeTab) return;
+
+    const currentLang = allLanguages[activeTab.language];
+    let highlightedCode = activeTab.content;
+
+    // Apply syntax highlighting
+    if (currentLang && currentLang.tokenizer) {
+      Object.entries(currentLang.tokenizer).forEach(([tokenType, regex]) => {
+        const colorMap: { [key: string]: string } = {
+          keywords: theme.colors.keyword,
+          strings: theme.colors.string,
+          comments: theme.colors.comment,
+          functions: theme.colors.function,
+          numbers: theme.colors.number,
+          types: theme.colors.keyword,
+          tags: theme.colors.keyword,
+          attributes: theme.colors.function,
+          selectors: theme.colors.keyword,
+          properties: theme.colors.function,
+          values: theme.colors.string,
+        };
+
+        const color = colorMap[tokenType] || theme.colors.text;
+        highlightedCode = highlightedCode.replace(
+          regex,
+          match => `<span style="color: ${color}">${match}</span>`,
+        );
+      });
+    }
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${activeTab.name}</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: ${theme.colors.background};
+      color: ${theme.colors.text};
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    pre {
+      margin: 0;
+      padding: 20px;
+      background-color: ${theme.colors.surface};
+      border-radius: 8px;
+      border: 2px solid ${theme.colors.border};
+      overflow-x: auto;
+    }
+    code {
+      display: block;
+      white-space: pre;
+    }
+    .header {
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid ${theme.colors.border};
+      color: ${theme.colors.textSecondary};
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <strong>File:</strong> ${activeTab.name} |
+    <strong>Language:</strong> ${activeTab.language.toUpperCase()} |
+    <strong>Theme:</strong> ${theme.name} |
+    <strong>Generated by:</strong> CodeLab Pro
+  </div>
+  <pre><code>${highlightedCode}</code></pre>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = activeTab.name.replace(/\.[^/.]+$/, "") + ".html";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showNotification("Exported as HTML with syntax highlighting", "success");
+  }, [activeTab, allLanguages, theme, showNotification]);
 
   // ==================== CODE FORMATTING ====================
   const formatCode = useCallback(() => {
@@ -730,6 +891,9 @@ const EnhancedCodeEditor: React.FC = () => {
 
   // ==================== COMMAND PALETTE ====================
   const allCommands = useMemo(() => {
+    const themeNames = Object.keys(allThemes);
+    let currentThemeIndex = themeNames.indexOf(currentTheme);
+
     const builtIn: CommandDefinition[] = [
       {
         id: "new-file",
@@ -775,11 +939,33 @@ const EnhancedCodeEditor: React.FC = () => {
         id: "change-theme",
         name: "Change Theme",
         description: "Switch editor theme",
-        handler: () => {},
+        handler: () => {
+          currentThemeIndex = (currentThemeIndex + 1) % themeNames.length;
+          setCurrentTheme(themeNames[currentThemeIndex]);
+          showNotification(`Theme changed to ${allThemes[themeNames[currentThemeIndex]].name}`, "success");
+        },
+      },
+      {
+        id: "export-html",
+        name: "Export as HTML",
+        description: "Export file with syntax highlighting",
+        handler: exportAsHTML,
+      },
+      {
+        id: "open-extensions",
+        name: "Open Extensions",
+        description: "Manage installed extensions",
+        handler: () => setShowExtensionsPanel(true),
+      },
+      {
+        id: "install-extension",
+        name: "Install Extension",
+        description: "Install a new extension",
+        handler: () => setShowExtensionInstaller(true),
       },
     ];
     return [...builtIn, ...customCommands];
-  }, [customCommands, createNewTab, openFile, saveCurrentTab, formatCode]);
+  }, [customCommands, createNewTab, openFile, saveCurrentTab, formatCode, exportAsHTML, currentTheme, allThemes, showNotification]);
 
   const filteredCommands = useMemo(() => {
     if (!commandSearch) return allCommands;
@@ -824,6 +1010,26 @@ const EnhancedCodeEditor: React.FC = () => {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
+  // ==================== CONTEXT MENU ====================
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      visible: true,
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (contextMenu?.visible) {
+        setContextMenu(null);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [contextMenu]);
+
   // ==================== SYNC EDITOR CONTENT ====================
   useEffect(() => {
     if (editorRef.current && activeTab) {
@@ -854,8 +1060,10 @@ const EnhancedCodeEditor: React.FC = () => {
         formatCode={formatCode}
         toggleSplitView={toggleSplitView}
         setShowSettings={setShowSettings}
+        setShowExtensionsPanel={setShowExtensionsPanel}
         settings={settings}
         setSettings={setSettings}
+        exportAsHTML={exportAsHTML}
       />
 
       {/* Tab Bar */}
@@ -877,6 +1085,7 @@ const EnhancedCodeEditor: React.FC = () => {
           settings={settings}
           handleTextChange={e => handleTextChange(e, activeTabId)}
           handleKeyDown={handleKeyDown}
+          handleContextMenu={handleContextMenu}
         />
 
         {splitView && secondaryTab && (
@@ -892,10 +1101,23 @@ const EnhancedCodeEditor: React.FC = () => {
               settings={settings}
               handleTextChange={e => handleTextChange(e, secondaryTab.id)}
               handleKeyDown={handleKeyDown}
+              handleContextMenu={handleContextMenu}
             />
           </>
         )}
       </div>
+
+      {/* Context Menu */}
+      {contextMenu?.visible && (
+        <ContextMenu
+          theme={theme}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          formatCode={formatCode}
+          editorRef={editorRef}
+        />
+      )}
 
       {/* Status Bar */}
       <StatusBar
@@ -905,6 +1127,7 @@ const EnhancedCodeEditor: React.FC = () => {
         currentTheme={currentTheme}
         setCurrentTheme={setCurrentTheme}
         allThemes={allThemes}
+        statusBarConfig={statusBarConfig}
       />
 
       {/* Command Palette */}
@@ -929,6 +1152,34 @@ const EnhancedCodeEditor: React.FC = () => {
           currentTheme={currentTheme}
           setCurrentTheme={setCurrentTheme}
           onClose={() => setShowSettings(false)}
+          statusBarConfig={statusBarConfig}
+          setStatusBarConfig={setStatusBarConfig}
+        />
+      )}
+
+      {/* Extensions Panel */}
+      {showExtensionsPanel && (
+        <ExtensionsPanel
+          theme={theme}
+          pluginManager={pluginManagerRef.current}
+          installedPlugins={installedPlugins}
+          setInstalledPlugins={setInstalledPlugins}
+          showNotification={showNotification}
+          onClose={() => setShowExtensionsPanel(false)}
+          onOpenInstaller={() => setShowExtensionInstaller(true)}
+        />
+      )}
+
+      {/* Extension Installer */}
+      {showExtensionInstaller && (
+        <ExtensionInstallerModal
+          theme={theme}
+          pluginManager={pluginManagerRef.current}
+          pluginAPI={pluginAPI}
+          installedPlugins={installedPlugins}
+          setInstalledPlugins={setInstalledPlugins}
+          showNotification={showNotification}
+          onClose={() => setShowExtensionInstaller(false)}
         />
       )}
 
@@ -957,8 +1208,10 @@ const MenuBar: React.FC<any> = ({
   formatCode,
   toggleSplitView,
   setShowSettings,
+  setShowExtensionsPanel,
   settings,
   setSettings,
+  exportAsHTML,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -995,6 +1248,17 @@ const MenuBar: React.FC<any> = ({
           action: saveCurrentTab,
         },
         { label: "Save As...", icon: Download, action: saveCurrentTab },
+        { label: "divider" },
+        {
+          label: "Export as Plain Text",
+          icon: FileText,
+          action: saveCurrentTab,
+        },
+        {
+          label: "Export as HTML",
+          icon: FileCode,
+          action: exportAsHTML,
+        },
       ],
     },
     {
@@ -1078,7 +1342,7 @@ const MenuBar: React.FC<any> = ({
           action: () => setShowSettings(true),
         },
         { label: "Themes", icon: Palette, action: () => setShowSettings(true) },
-        { label: "Extensions", icon: Zap, action: () => setShowSettings(true) },
+        { label: "Extensions", icon: Zap, action: () => setShowExtensionsPanel(true) },
       ],
     },
   ];
@@ -1132,28 +1396,39 @@ const MenuBar: React.FC<any> = ({
                   borderColor: theme.colors.border,
                 }}
               >
-                {menu.items.map((item, idx) => (
-                  <button
-                    key={idx}
-                    className="menu-dropdown-item"
-                    style={{ color: theme.colors.text }}
-                    onClick={() => {
-                      item.action();
-                      setShowMenuDropdown(null);
-                    }}
-                  >
-                    {item.icon && <item.icon size={16} />}
-                    <span>{item.label}</span>
-                    {item.shortcut && (
-                      <span
-                        className="menu-shortcut"
-                        style={{ color: theme.colors.textSecondary }}
-                      >
-                        {item.shortcut}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                {menu.items.map((item, idx) =>
+                  item.label === "divider" ? (
+                    <div
+                      key={idx}
+                      style={{
+                        height: "1px",
+                        backgroundColor: theme.colors.border,
+                        margin: "4px 0",
+                      }}
+                    />
+                  ) : (
+                    <button
+                      key={idx}
+                      className="menu-dropdown-item"
+                      style={{ color: theme.colors.text }}
+                      onClick={() => {
+                        item.action();
+                        setShowMenuDropdown(null);
+                      }}
+                    >
+                      {item.icon && <item.icon size={16} />}
+                      <span>{item.label}</span>
+                      {item.shortcut && (
+                        <span
+                          className="menu-shortcut"
+                          style={{ color: theme.colors.textSecondary }}
+                        >
+                          {item.shortcut}
+                        </span>
+                      )}
+                    </button>
+                  )
+                )}
               </div>
             )}
           </div>
@@ -1252,7 +1527,7 @@ const TabBar: React.FC<any> = ({
 
 // Editor Pane Component
 const EditorPane = React.forwardRef<HTMLDivElement, any>(
-  ({ tab, theme, settings, handleTextChange, handleKeyDown }, ref) => {
+  ({ tab, theme, settings, handleTextChange, handleKeyDown, handleContextMenu }, ref) => {
     if (!tab) return null;
 
     const lineCount = tab.content.split("\n").length;
@@ -1284,6 +1559,7 @@ const EditorPane = React.forwardRef<HTMLDivElement, any>(
             spellCheck={settings.spellCheck}
             onInput={e => handleTextChange(e.currentTarget)}
             onKeyDown={handleKeyDown}
+            onContextMenu={handleContextMenu}
             style={{
               color: theme.colors.text,
               fontSize: `${settings.fontSize}px`,
@@ -1305,6 +1581,7 @@ const StatusBar: React.FC<any> = ({
   currentTheme,
   setCurrentTheme,
   allThemes,
+  statusBarConfig,
 }) => {
   const [showThemeSelector, setShowThemeSelector] = useState(false);
 
@@ -1318,26 +1595,34 @@ const StatusBar: React.FC<any> = ({
       }}
     >
       <div className="status-left">
-        <div className="status-item" title="Language">
-          <FileCode size={12} />
-          <span>{tab?.language.toUpperCase() || "PLAIN"}</span>
-        </div>
-        <div className="status-item" title="Lines">
-          <Hash size={12} />
-          <span>{tab?.content.split("\n").length || 0} lines</span>
-        </div>
-        <div className="status-item" title="Characters">
-          <Type size={12} />
-          <span>{tab?.content.length || 0} chars</span>
-        </div>
-        <div className="status-item" title="Git Branch">
-          <GitBranch size={12} />
-          <span>main</span>
-        </div>
+        {statusBarConfig.showLanguage && (
+          <div className="status-item" title="Language">
+            <FileCode size={12} />
+            <span>{tab?.language.toUpperCase() || "PLAIN"}</span>
+          </div>
+        )}
+        {statusBarConfig.showLineCount && (
+          <div className="status-item" title="Lines">
+            <Hash size={12} />
+            <span>{tab?.content.split("\n").length || 0} lines</span>
+          </div>
+        )}
+        {statusBarConfig.showCharCount && (
+          <div className="status-item" title="Characters">
+            <Type size={12} />
+            <span>{tab?.content.length || 0} chars</span>
+          </div>
+        )}
+        {statusBarConfig.showGitBranch && (
+          <div className="status-item" title="Git Branch">
+            <GitBranch size={12} />
+            <span>main</span>
+          </div>
+        )}
       </div>
 
       <div className="status-right">
-        {customItems.map((item: StatusBarItem) => (
+        {statusBarConfig.showCustomItems && customItems.map((item: StatusBarItem) => (
           <div
             key={item.id}
             className="status-item status-clickable"
@@ -1349,14 +1634,16 @@ const StatusBar: React.FC<any> = ({
           </div>
         ))}
 
-        <div
-          className="status-item status-clickable"
-          onClick={() => setShowThemeSelector(!showThemeSelector)}
-          title="Change Theme"
-        >
-          <Palette size={12} />
-          <span>{theme.name}</span>
-        </div>
+        {statusBarConfig.showTheme && (
+          <div
+            className="status-item status-clickable"
+            onClick={() => setShowThemeSelector(!showThemeSelector)}
+            title="Change Theme"
+          >
+            <Palette size={12} />
+            <span>{theme.name}</span>
+          </div>
+        )}
 
         {showThemeSelector && (
           <div
@@ -1396,12 +1683,16 @@ const StatusBar: React.FC<any> = ({
           </div>
         )}
 
-        <div className="status-item" title="Encoding">
-          <span>UTF-8</span>
-        </div>
-        <div className="status-item" title="Line Ending">
-          <span>LF</span>
-        </div>
+        {statusBarConfig.showEncoding && (
+          <div className="status-item" title="Encoding">
+            <span>UTF-8</span>
+          </div>
+        )}
+        {statusBarConfig.showLineEnding && (
+          <div className="status-item" title="Line Ending">
+            <span>LF</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1523,7 +1814,6 @@ const CommandPalette: React.FC<any> = ({
 };
 
 // Settings Panel Component
-const pkg = import("../package.json");
 const SettingsPanel: React.FC<any> = ({
   theme,
   settings,
@@ -1532,6 +1822,8 @@ const SettingsPanel: React.FC<any> = ({
   currentTheme,
   setCurrentTheme,
   onClose,
+  statusBarConfig,
+  setStatusBarConfig,
 }) => {
   const categories = [
     {
@@ -1572,6 +1864,20 @@ const SettingsPanel: React.FC<any> = ({
       ],
     },
     {
+      name: "Status Bar",
+      icon: Layout,
+      settings: [
+        { key: "showLanguage", label: "Show Language", type: "statusbar" },
+        { key: "showLineCount", label: "Show Line Count", type: "statusbar" },
+        { key: "showCharCount", label: "Show Character Count", type: "statusbar" },
+        { key: "showGitBranch", label: "Show Git Branch", type: "statusbar" },
+        { key: "showTheme", label: "Show Theme Selector", type: "statusbar" },
+        { key: "showEncoding", label: "Show Encoding", type: "statusbar" },
+        { key: "showLineEnding", label: "Show Line Ending", type: "statusbar" },
+        { key: "showCustomItems", label: "Show Plugin Items", type: "statusbar" },
+      ],
+    },
+    {
       name: "Files",
       icon: File,
       settings: [
@@ -1583,13 +1889,20 @@ const SettingsPanel: React.FC<any> = ({
       name: "About",
       icon: Info,
       settings: [
-        { key: "version", label: "Version", type: "text" },
-        { key: "author", label: "Author: Involvex", type: "text" },
+        { key: "version", label: "Version", type: "info", value: "1.0.5" },
+        { key: "author", label: "Author", type: "info", value: "Involvex" },
+        { key: "license", label: "License", type: "info", value: "MIT" },
         {
           key: "repo",
-          label:
-            "Repository: " + (pkg.then(p => p.repository.url.toString()) || ""),
-          type: "text",
+          label: "Repository",
+          type: "info",
+          value: "https://github.com/involvex/codelab-pro-notepad",
+        },
+        {
+          key: "description",
+          label: "Description",
+          type: "info",
+          value: "Production-ready, extensible code editor",
         },
       ],
     },
@@ -1705,16 +2018,39 @@ const SettingsPanel: React.FC<any> = ({
                         ))}
                       </select>
                     )}
-                    {setting.type === "text" && setting.key === "info" && (
-                      <div>
-                        <span>{setting.label}</span>
-                        <span>{setting.value}</span>
-                        <span>{setting.description}</span>
-                        <span>{setting.version}</span>
-                        <span>{setting.author}</span>
-                        <span>{setting.license}</span>
-                        <span>{setting.repository}</span>
-                        <span>{setting.homepage}</span>
+
+                    {setting.type === "statusbar" && (
+                      <label className="settings-toggle">
+                        <input
+                          type="checkbox"
+                          checked={statusBarConfig[setting.key]}
+                          onChange={e =>
+                            setStatusBarConfig((prev: any) => ({
+                              ...prev,
+                              [setting.key]: e.target.checked,
+                            }))
+                          }
+                        />
+                        <span
+                          className="settings-toggle-slider"
+                          style={{
+                            backgroundColor: statusBarConfig[setting.key]
+                              ? theme.colors.primary
+                              : theme.colors.border,
+                          }}
+                        />
+                      </label>
+                    )}
+
+                    {setting.type === "info" && (
+                      <div
+                        style={{
+                          color: theme.colors.textSecondary,
+                          fontSize: "13px",
+                          fontFamily: "JetBrains Mono, monospace",
+                        }}
+                      >
+                        {setting.value}
                       </div>
                     )}
                   </div>
@@ -1744,6 +2080,724 @@ const Notification: React.FC<any> = ({ message, type, theme }) => {
     >
       <Check size={16} />
       <span>{message}</span>
+    </div>
+  );
+};
+
+// Context Menu Component
+const ContextMenu: React.FC<any> = ({
+  theme,
+  x,
+  y,
+  onClose,
+  formatCode,
+  editorRef,
+}) => {
+  const menuItems = [
+    {
+      label: "Cut",
+      icon: Scissors,
+      shortcut: "Ctrl+X",
+      action: () => document.execCommand("cut"),
+    },
+    {
+      label: "Copy",
+      icon: Copy,
+      shortcut: "Ctrl+C",
+      action: () => document.execCommand("copy"),
+    },
+    {
+      label: "Paste",
+      icon: ClipboardPaste,
+      shortcut: "Ctrl+V",
+      action: () => document.execCommand("paste"),
+    },
+    { divider: true },
+    {
+      label: "Select All",
+      icon: null,
+      shortcut: "Ctrl+A",
+      action: () => {
+        if (editorRef.current) {
+          const range = document.createRange();
+          range.selectNodeContents(editorRef.current);
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+        }
+      },
+    },
+    {
+      label: "Format",
+      icon: Wand2,
+      shortcut: "Ctrl+Shift+F",
+      action: formatCode,
+    },
+  ];
+
+  return (
+    <div
+      className="context-menu"
+      style={{
+        position: "fixed",
+        left: `${x}px`,
+        top: `${y}px`,
+        backgroundColor: theme.colors.surface,
+        borderColor: theme.colors.border,
+        color: theme.colors.text,
+        border: "2px solid",
+        borderRadius: "12px",
+        padding: "8px",
+        minWidth: "200px",
+        boxShadow: "0 12px 32px rgba(0, 0, 0, 0.3)",
+        backdropFilter: "blur(12px)",
+        zIndex: 9999,
+        animation: "dropdown-slide 0.2s ease",
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      {menuItems.map((item, idx) =>
+        item.divider ? (
+          <div
+            key={idx}
+            style={{
+              height: "1px",
+              backgroundColor: theme.colors.border,
+              margin: "4px 0",
+            }}
+          />
+        ) : (
+          <button
+            key={idx}
+            onClick={() => {
+              item.action();
+              onClose();
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              padding: "10px 12px",
+              border: "none",
+              borderRadius: "8px",
+              backgroundColor: "transparent",
+              color: theme.colors.text,
+              cursor: "pointer",
+              width: "100%",
+              fontSize: "13px",
+              fontWeight: 500,
+              fontFamily: "Outfit, sans-serif",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = theme.colors.menuHover;
+              e.currentTarget.style.transform = "translateX(4px)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.transform = "translateX(0)";
+            }}
+          >
+            {item.icon && <item.icon size={16} />}
+            <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
+            {item.shortcut && (
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: theme.colors.textSecondary,
+                  fontFamily: "JetBrains Mono, monospace",
+                }}
+              >
+                {item.shortcut}
+              </span>
+            )}
+          </button>
+        ),
+      )}
+    </div>
+  );
+};
+
+// Extensions Panel Component
+const ExtensionsPanel: React.FC<any> = ({
+  theme,
+  pluginManager,
+  installedPlugins,
+  setInstalledPlugins,
+  showNotification,
+  onClose,
+  onOpenInstaller,
+}) => {
+  const plugins = pluginManager?.getAllPlugins() || [];
+
+  const generateSampleExtension = () => {
+    const sampleCode = `// Sample Plugin for CodeLab Pro
+const samplePlugin = {
+  id: 'sample-plugin-${Date.now()}',
+  name: 'My Sample Plugin',
+  version: '1.0.0',
+  description: 'A sample plugin created from template',
+  author: 'Your Name',
+  activate: (api) => {
+    // Register a command
+    api.registerCommand({
+      id: 'sample-command',
+      name: 'Sample Command',
+      description: 'Execute sample action',
+      keybinding: 'Ctrl+Shift+S',
+      handler: () => {
+        api.showNotification('Sample plugin activated!', 'success');
+      }
+    });
+
+    // Register a status bar item
+    api.registerStatusBarItem({
+      id: 'sample-status',
+      text: 'Sample',
+      alignment: 'right',
+      priority: 1,
+      onClick: () => {
+        api.showNotification('Status bar clicked!', 'info');
+      }
+    });
+  },
+  deactivate: () => {
+    console.log('Sample plugin deactivated');
+  }
+};
+
+// Export the plugin
+export default samplePlugin;`;
+
+    const blob = new Blob([sampleCode], { type: "text/javascript" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sample-plugin.js";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showNotification("Sample extension downloaded", "success");
+  };
+
+  const uninstallPlugin = (pluginId: string) => {
+    if (confirm("Are you sure you want to uninstall this extension?")) {
+      pluginManager?.unregisterPlugin(pluginId);
+      const newPlugins = { ...installedPlugins };
+      delete newPlugins[pluginId];
+      setInstalledPlugins(newPlugins);
+      localStorage.setItem("codelab-plugins", JSON.stringify(newPlugins));
+      showNotification("Extension uninstalled", "success");
+    }
+  };
+
+  return (
+    <div className="settings-overlay" onClick={onClose}>
+      <div
+        className="settings-panel glass-panel"
+        style={{
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.border,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div
+          className="settings-header"
+          style={{ borderColor: theme.colors.border }}
+        >
+          <div className="settings-title" style={{ color: theme.colors.text }}>
+            <Zap size={20} />
+            <h2>Extensions</h2>
+          </div>
+          <button
+            className="settings-close"
+            onClick={onClose}
+            style={{ color: theme.colors.textSecondary }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="settings-content">
+          <div style={{ marginBottom: "24px", display: "flex", gap: "12px" }}>
+            <button
+              onClick={onOpenInstaller}
+              style={{
+                padding: "12px 24px",
+                backgroundColor: theme.colors.primary,
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "14px",
+                fontFamily: "Outfit, sans-serif",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              Install Extension
+            </button>
+            <button
+              onClick={generateSampleExtension}
+              style={{
+                padding: "12px 24px",
+                backgroundColor: theme.colors.surfaceAlt,
+                color: theme.colors.text,
+                border: `2px solid ${theme.colors.border}`,
+                borderRadius: "8px",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "14px",
+                fontFamily: "Outfit, sans-serif",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.backgroundColor = theme.colors.menuHover;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceAlt;
+              }}
+            >
+              Create Sample Extension
+            </button>
+          </div>
+
+          <h3
+            style={{
+              color: theme.colors.text,
+              marginBottom: "16px",
+              fontSize: "16px",
+              fontWeight: 600,
+            }}
+          >
+            Installed Extensions ({plugins.length})
+          </h3>
+
+          {plugins.length === 0 ? (
+            <div
+              style={{
+                padding: "40px",
+                textAlign: "center",
+                color: theme.colors.textSecondary,
+              }}
+            >
+              No extensions installed
+            </div>
+          ) : (
+            plugins.map((plugin: Plugin) => (
+              <div
+                key={plugin.id}
+                style={{
+                  padding: "16px",
+                  marginBottom: "12px",
+                  borderRadius: "12px",
+                  border: `1px solid ${theme.colors.border}`,
+                  backgroundColor: "rgba(255, 255, 255, 0.03)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <h4
+                      style={{
+                        color: theme.colors.text,
+                        fontSize: "15px",
+                        fontWeight: 600,
+                        marginBottom: "4px",
+                      }}
+                    >
+                      {plugin.name}
+                    </h4>
+                    <p
+                      style={{
+                        color: theme.colors.textSecondary,
+                        fontSize: "13px",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      {plugin.description}
+                    </p>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "16px",
+                        fontSize: "12px",
+                        color: theme.colors.textSecondary,
+                        fontFamily: "JetBrains Mono, monospace",
+                      }}
+                    >
+                      <span>v{plugin.version}</span>
+                      <span>by {plugin.author}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => uninstallPlugin(plugin.id)}
+                    style={{
+                      padding: "8px 16px",
+                      backgroundColor: theme.colors.error,
+                      color: "white",
+                      border: "none",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      fontFamily: "Outfit, sans-serif",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.transform = "scale(1.05)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
+                  >
+                    Uninstall
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Extension Installer Modal Component
+const ExtensionInstallerModal: React.FC<any> = ({
+  theme,
+  pluginManager,
+  pluginAPI,
+  installedPlugins,
+  setInstalledPlugins,
+  showNotification,
+  onClose,
+}) => {
+  const [activeTab, setActiveTab] = useState<"npm" | "github" | "local">("local");
+  const [inputValue, setInputValue] = useState("");
+  const [isInstalling, setIsInstalling] = useState(false);
+
+  const installExtension = async (source: string, type: "npm" | "github" | "local") => {
+    if (!source.trim() && type !== "local") {
+      showNotification("Please provide a valid source", "error");
+      return;
+    }
+
+    setIsInstalling(true);
+    try {
+      let code: string;
+
+      if (type === "npm") {
+        const response = await fetch(`https://unpkg.com/${source}`);
+        if (!response.ok) throw new Error("Package not found");
+        code = await response.text();
+      } else if (type === "github") {
+        const response = await fetch(source);
+        if (!response.ok) throw new Error("Failed to fetch from GitHub");
+        code = await response.text();
+      } else {
+        // Local file handled by file input
+        return;
+      }
+
+      // Evaluate and install plugin
+      const func = new Function("exports", "module", code);
+      const module: any = { exports: {} };
+      func(module.exports, module);
+      const plugin = module.exports.default || module.exports;
+
+      if (!plugin.id || !plugin.activate) {
+        throw new Error("Invalid plugin structure. Must have id and activate.");
+      }
+
+      // Register the plugin
+      pluginManager?.registerPlugin(plugin);
+
+      // Save to localStorage
+      const newPlugins = {
+        ...installedPlugins,
+        [plugin.id]: {
+          code,
+          enabled: true,
+          installedAt: new Date().toISOString(),
+        },
+      };
+      setInstalledPlugins(newPlugins);
+      localStorage.setItem("codelab-plugins", JSON.stringify(newPlugins));
+
+      showNotification(`Plugin "${plugin.name}" installed successfully`, "success");
+      setInputValue("");
+      onClose();
+    } catch (error: any) {
+      showNotification(`Failed to install: ${error.message}`, "error");
+    } finally {
+      setIsInstalling(false);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const code = event.target?.result as string;
+      setIsInstalling(true);
+      try {
+        const func = new Function("exports", "module", code);
+        const module: any = { exports: {} };
+        func(module.exports, module);
+        const plugin = module.exports.default || module.exports;
+
+        if (!plugin.id || !plugin.activate) {
+          throw new Error("Invalid plugin structure");
+        }
+
+        pluginManager?.registerPlugin(plugin);
+
+        const newPlugins = {
+          ...installedPlugins,
+          [plugin.id]: {
+            code,
+            enabled: true,
+            installedAt: new Date().toISOString(),
+          },
+        };
+        setInstalledPlugins(newPlugins);
+        localStorage.setItem("codelab-plugins", JSON.stringify(newPlugins));
+
+        showNotification(`Plugin "${plugin.name}" installed successfully`, "success");
+        onClose();
+      } catch (error: any) {
+        showNotification(`Failed to install: ${error.message}`, "error");
+      } finally {
+        setIsInstalling(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div className="settings-overlay" onClick={onClose}>
+      <div
+        className="settings-panel glass-panel"
+        style={{
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.border,
+          maxWidth: "600px",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div
+          className="settings-header"
+          style={{ borderColor: theme.colors.border }}
+        >
+          <div className="settings-title" style={{ color: theme.colors.text }}>
+            <Download size={20} />
+            <h2>Install Extension</h2>
+          </div>
+          <button
+            className="settings-close"
+            onClick={onClose}
+            style={{ color: theme.colors.textSecondary }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="settings-content">
+          <div
+            style={{
+              padding: "16px",
+              marginBottom: "24px",
+              borderRadius: "8px",
+              backgroundColor: "rgba(255, 165, 0, 0.1)",
+              border: `1px solid ${theme.colors.warning}`,
+              color: theme.colors.warning,
+              fontSize: "13px",
+            }}
+          >
+            Warning: Only install extensions from trusted sources. Extensions have access to editor content and can execute arbitrary code.
+          </div>
+
+          <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+            {(["local", "github", "npm"] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  backgroundColor:
+                    activeTab === tab ? theme.colors.primary : theme.colors.surfaceAlt,
+                  color: activeTab === tab ? "white" : theme.colors.text,
+                  border: `2px solid ${activeTab === tab ? theme.colors.primary : theme.colors.border}`,
+                  borderRadius: "8px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  fontFamily: "Outfit, sans-serif",
+                  textTransform: "capitalize",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {tab === "npm" ? "NPM" : tab}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "local" && (
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "12px",
+                  color: theme.colors.text,
+                  fontWeight: 500,
+                }}
+              >
+                Upload Plugin File (.js)
+              </label>
+              <input
+                type="file"
+                accept=".js"
+                onChange={handleFileUpload}
+                disabled={isInstalling}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  backgroundColor: theme.colors.surfaceAlt,
+                  color: theme.colors.text,
+                  border: `2px solid ${theme.colors.border}`,
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  fontFamily: "Outfit, sans-serif",
+                  cursor: "pointer",
+                }}
+              />
+            </div>
+          )}
+
+          {activeTab === "github" && (
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "12px",
+                  color: theme.colors.text,
+                  fontWeight: 500,
+                }}
+              >
+                GitHub Raw URL
+              </label>
+              <input
+                type="text"
+                value={inputValue}
+                onChange={e => setInputValue(e.target.value)}
+                placeholder="https://raw.githubusercontent.com/user/repo/main/plugin.js"
+                disabled={isInstalling}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  backgroundColor: theme.colors.surfaceAlt,
+                  color: theme.colors.text,
+                  border: `2px solid ${theme.colors.border}`,
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  fontFamily: "Outfit, sans-serif",
+                  marginBottom: "16px",
+                }}
+              />
+              <button
+                onClick={() => installExtension(inputValue, "github")}
+                disabled={isInstalling || !inputValue.trim()}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  backgroundColor: theme.colors.primary,
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontWeight: 600,
+                  cursor: isInstalling ? "not-allowed" : "pointer",
+                  fontSize: "14px",
+                  fontFamily: "Outfit, sans-serif",
+                  opacity: isInstalling || !inputValue.trim() ? 0.5 : 1,
+                }}
+              >
+                {isInstalling ? "Installing..." : "Install from GitHub"}
+              </button>
+            </div>
+          )}
+
+          {activeTab === "npm" && (
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "12px",
+                  color: theme.colors.text,
+                  fontWeight: 500,
+                }}
+              >
+                NPM Package Name
+              </label>
+              <input
+                type="text"
+                value={inputValue}
+                onChange={e => setInputValue(e.target.value)}
+                placeholder="package-name"
+                disabled={isInstalling}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  backgroundColor: theme.colors.surfaceAlt,
+                  color: theme.colors.text,
+                  border: `2px solid ${theme.colors.border}`,
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  fontFamily: "Outfit, sans-serif",
+                  marginBottom: "16px",
+                }}
+              />
+              <button
+                onClick={() => installExtension(inputValue, "npm")}
+                disabled={isInstalling || !inputValue.trim()}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  backgroundColor: theme.colors.primary,
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontWeight: 600,
+                  cursor: isInstalling ? "not-allowed" : "pointer",
+                  fontSize: "14px",
+                  fontFamily: "Outfit, sans-serif",
+                  opacity: isInstalling || !inputValue.trim() ? 0.5 : 1,
+                }}
+              >
+                {isInstalling ? "Installing..." : "Install from NPM"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
