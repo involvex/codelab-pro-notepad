@@ -7,7 +7,7 @@
     "url": "https://github.com/involvex/codelab-pro-notepad.git"
   },
   "bin": {
-    "codelab": "./bin/codelab.js"
+    "codelab": "bin/codelab.js"
   },
   "type": "module",
   "scripts": {
