@@ -1,6 +1,6 @@
 {
   "name": "codelab-pro-notepad",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Production-ready, extensible code editor with plugin system and custom themes",
   "main": "dist/index.js",
   "homepage": "https://github.com/involvex/codelab-pro-notepad#readme",
