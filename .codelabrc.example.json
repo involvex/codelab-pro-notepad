@@ -1,0 +1,27 @@
+{
+  "server": {
+    "port": 3000,
+    "host": "0.0.0.0",
+    "maxAge": 31536000
+  },
+  "editor": {
+    "defaultTheme": "dracula",
+    "defaultLanguage": "javascript",
+    "fontSize": 14,
+    "tabSize": 2,
+    "wordWrap": false,
+    "lineNumbers": true,
+    "minimap": true,
+    "autoSave": false,
+    "autoSaveDelay": 1000
+  },
+  "plugins": {
+    "enabled": true,
+    "autoLoad": true,
+    "directory": "./plugins"
+  },
+  "security": {
+    "allowRemotePlugins": false,
+    "trustedDomains": []
+  }
+}

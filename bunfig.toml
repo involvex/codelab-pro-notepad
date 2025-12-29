@@ -1,0 +1,22 @@
+[serve.static]
+env = "BUN_PUBLIC_*"
+
+[serve]
+
+[build]
+environment = "production"
+minify = true
+target = "node"
+include = ["src/**/*"]
+root = "./"
+require = ["src/index.ts","bun-env.d.ts"]
+sourceMap = true
+
+[install]
+pkgs = ["react", "react-dom", "react-scripts"]
+node = "22"
+mirror = "https://registry.npmjs.org/"
+node_modules = "node_modules"
+
+[lint]
+enabled = true

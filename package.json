@@ -1,0 +1,62 @@
+{
+  "name": "codelab-pro-notepad",
+  "version": "1.0.0",
+  "description": "Production-ready, extensible code editor with plugin system and custom themes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/involvex/codelab-pro-notepad.git"
+  },
+  "bin": {
+    "codelab": "./bin/codelab.js"
+  },
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot --watch src/dev-server.tsx",
+    "build": "bun run clean && bun run typecheck && bun run build:prod && bun run build:html",
+    "build:prod": "bun build ./src/index.tsx --outdir=dist --target=browser --minify --splitting --format=esm --sourcemap=external",
+    "build:html": "node scripts/generate-html.js",
+    "start": "bun run scripts/serve.ts",
+    "lint": "eslint . --ext .ts,.tsx --ignore-pattern node_modules --ignore-pattern dist --ignore-pattern enhanced-code-editor --ignore-pattern dev-build --ignore-pattern bin",
+    "lint:fix": "eslint . --fix --ext .ts,.tsx --ignore-pattern node_modules --ignore-pattern dist --ignore-pattern enhanced-code-editor --ignore-pattern dev-build --ignore-pattern bin",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist dev-build",
+    "preview": "bun run build && bun run start",
+    "prebuild": "bun run format && bun run lint:fix && bun run typecheck"
+  },
+  "dependencies": {
+    "lucide-react": "^0.562.0",
+    "react": "^19",
+    "react-dom": "^19",
+    "rimraf": "^6.1.2"
+  },
+  "devDependencies": {
+    "@eslint/css": "^0.14.1",
+    "@eslint/js": "^9.39.2",
+    "@eslint/json": "^0.14.0",
+    "@types/bun": "latest",
+    "@types/eslint": "^9.6.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.5.0",
+    "jiti": "^2.6.1",
+    "prettier": "^3.7.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.50.1"
+  },
+  "keywords": [
+    "code-editor",
+    "notepad",
+    "react",
+    "typescript",
+    "plugin-system",
+    "themes",
+    "extensible"
+  ],
+  "author": "Involvex",
+  "license": "MIT"
+}
