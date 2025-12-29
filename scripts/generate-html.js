@@ -10,17 +10,27 @@ const distDir = join(process.cwd(), 'dist');
 
 // Find the generated files
 const files = readdirSync(distDir);
-const jsFile = files.find(f => f.startsWith('index') && f.endsWith('.js') && !f.endsWith('.map'));
+
+// Find the main entry point (exactly "index.js") and all chunks
+const mainJs = files.find(f => f === 'index.js');
+const chunks = files.filter(f =>
+  f.endsWith('.js') &&
+  !f.endsWith('.map') &&
+  f !== 'index.js' &&
+  (f.startsWith('index-') || f.startsWith('package-'))
+);
 const cssFile = files.find(f => f.startsWith('index') && f.endsWith('.css'));
 
-if (!jsFile) {
-  console.error('❌ No JavaScript file found in dist/');
+if (!mainJs) {
+  console.error('❌ Main entry point (index.js) not found in dist/');
+  console.error('Available files:', files);
   process.exit(1);
 }
 
 console.log(`✅ Found assets:
-   JS:  ${jsFile}
-   CSS: ${cssFile || 'none'}`);
+   Main JS: ${mainJs}
+   Chunks:  ${chunks.join(', ') || 'none'}
+   CSS:     ${cssFile || 'none'}`);
 
 // Generate HTML
 const html = `<!DOCTYPE html>
@@ -69,7 +79,7 @@ const html = `<!DOCTYPE html>
       <div class="loading-text">Loading CodeLab Pro...</div>
     </div>
     <div id="root"></div>
-    <script type="module" src="./${jsFile}"></script>
+    <script type="module" src="./${mainJs}"></script>
     <script>
       setTimeout(() => {
         const loading = document.getElementById('loading');

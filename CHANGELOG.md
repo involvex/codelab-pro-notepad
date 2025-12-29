@@ -5,6 +5,19 @@ All notable changes to CodeLab Pro Notepad will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2024-12-29
+
+### Fixed
+- **CRITICAL: Blank Page Issue** - Fixed production build loading wrong JavaScript file
+  - HTML was referencing `index-fjx5fq7w.js` (700 byte chunk) instead of `index.js` (420KB main bundle)
+  - Updated `scripts/generate-html.js` to correctly identify main entry point
+  - Both CLI and dev server now load properly with full editor UI
+- **Build Script Logic** - Improved file detection to distinguish between entry points and code-split chunks
+
+### Changed
+- Version bumped to 1.0.5
+- Better logging in build script showing main JS, chunks, and CSS separately
+
 ## [1.0.4] - 2024-12-29
 
 ### Fixed
