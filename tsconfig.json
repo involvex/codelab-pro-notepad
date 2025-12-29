@@ -24,7 +24,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@editor/*": ["./enhanced-code-editor/*"]
+      "@editor/*": ["./enhanced-code-editor/*"],
+      "@scripts/*": ["./scripts/*"],
+      "@dev-build/*": ["./dev-build/*"],
+      "@dist/*": ["./dist/*"],
+      "@enhanced-code-editor/*": ["./enhanced-code-editor/*"]
     },
 
     // Some stricter flags (disabled by default)
@@ -37,6 +41,13 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
+    "bin/codelab.js",
+    "scripts/generate-html.js",
+    "scripts/serve.ts",
+    "src/dev-server.tsx",
+    "src/dev-build/**/*",
+    "dist/**/*",
+    "enhanced-code-editor/**/*",
     "enhanced-code-editor/index.tsx",
     "enhanced-code-editor/example-plugin.ts",
     "enhanced-code-editor/editor-styles.css"

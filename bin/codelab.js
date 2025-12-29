@@ -5,32 +5,33 @@
  * Starts the production server for CodeLab Pro
  */
 
-import { resolve, join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { loadConfig, displayConfig, createDefaultConfig } from './config.js';
+import { resolve, join, dirname } from "path";
+import { fileURLToPath } from "url";
+import { loadConfig, displayConfig, createDefaultConfig } from "./config.js";
+import bun from "bun";
 
 // Get the installation directory
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const ROOT_DIR = resolve(__dirname, '..');
-const DIST_DIR = join(ROOT_DIR, 'dist');
+const ROOT_DIR = resolve(__dirname, "..");
+const DIST_DIR = join(ROOT_DIR, "dist");
 
 // Handle CLI commands
 const command = process.argv[2];
 
-if (command === 'init') {
-  console.log('\n🔧 Initializing CodeLab Pro configuration...\n');
+if (command === "init") {
+  console.log("\n🔧 Initializing CodeLab Pro configuration...\n");
   createDefaultConfig(ROOT_DIR);
   process.exit(0);
 }
 
-if (command === 'config') {
+if (command === "config") {
   const config = loadConfig(ROOT_DIR);
   displayConfig(config);
   process.exit(0);
 }
 
-if (command === 'help' || command === '--help' || command === '-h') {
+if (command === "help" || command === "--help" || command === "-h") {
   console.log(`
 CodeLab Pro CLI
 
@@ -73,7 +74,7 @@ console.log(`
 `);
 
 // Check if dist/ exists
-const distExists = await Bun.file(join(DIST_DIR, 'index.html')).exists();
+const distExists = await bun.file(join(DIST_DIR, "index.html")).exists();
 
 if (!distExists) {
   console.error(`
@@ -90,7 +91,7 @@ if (!distExists) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const server = Bun.serve({
+const server = bun.serve({
   port: PORT,
   hostname: config.server.host,
   async fetch(req) {
@@ -98,46 +99,47 @@ const server = Bun.serve({
     let path = url.pathname;
 
     // Default to index.html for root
-    if (path === '/') {
-      path = '/index.html';
+    if (path === "/") {
+      path = "/index.html";
     }
 
     // Try to serve the file from dist
     const filePath = DIST_DIR + path;
-    const file = Bun.file(filePath);
+    const file = bun.file(filePath);
 
     if (await file.exists()) {
       // Determine content type
-      let contentType = 'application/octet-stream';
-      if (path.endsWith('.html')) contentType = 'text/html';
-      else if (path.endsWith('.js')) contentType = 'application/javascript';
-      else if (path.endsWith('.css')) contentType = 'text/css';
-      else if (path.endsWith('.json')) contentType = 'application/json';
-      else if (path.endsWith('.svg')) contentType = 'image/svg+xml';
-      else if (path.endsWith('.png')) contentType = 'image/png';
-      else if (path.endsWith('.jpg') || path.endsWith('.jpeg')) contentType = 'image/jpeg';
+      let contentType = "application/octet-stream";
+      if (path.endsWith(".html")) contentType = "text/html";
+      else if (path.endsWith(".js")) contentType = "application/javascript";
+      else if (path.endsWith(".css")) contentType = "text/css";
+      else if (path.endsWith(".json")) contentType = "application/json";
+      else if (path.endsWith(".svg")) contentType = "image/svg+xml";
+      else if (path.endsWith(".png")) contentType = "image/png";
+      else if (path.endsWith(".jpg") || path.endsWith(".jpeg"))
+        contentType = "image/jpeg";
 
       return new Response(file, {
         headers: {
-          'Content-Type': contentType,
-          'Cache-Control': `public, max-age=${config.server.maxAge}`,
+          "Content-Type": contentType,
+          "Cache-Control": `public, max-age=${config.server.maxAge}`,
         },
       });
     }
 
     // SPA fallback - serve index.html for unknown routes
-    const indexFile = Bun.file(DIST_DIR + '/index.html');
+    const indexFile = bun.file(DIST_DIR + "/index.html");
     if (await indexFile.exists()) {
       return new Response(indexFile, {
-        headers: { 'Content-Type': 'text/html' },
+        headers: { "Content-Type": "text/html" },
       });
     }
 
-    return new Response('Not Found', { status: 404 });
+    return new Response("Not Found", { status: 404 });
   },
   error(error) {
-    console.error('Server error:', error);
-    return new Response('Internal Server Error', { status: 500 });
+    console.error("Server error:", error);
+    return new Response("Internal Server Error", { status: 500 });
   },
 });
 

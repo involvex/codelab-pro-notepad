@@ -7,9 +7,9 @@ env = "BUN_PUBLIC_*"
 environment = "production"
 minify = true
 target = "node"
-include = ["src/**/*"]
+include = ["src/**/*","bin/**/*","scripts/**/*","dev-build/**/*","dist/**/*","enhanced-code-editor/**/*"]
 root = "./"
-require = ["src/index.ts","bun-env.d.ts"]
+require = ["src/index.ts","bun-env.d.ts","bin/codelab.js","scripts/generate-html.js","scripts/serve.ts","src/dev-server.tsx","src/dev-build/**/*"]
 sourceMap = true
 
 [install]
