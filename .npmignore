@@ -1,0 +1,38 @@
+# Development files
+.claude/
+.mira/
+dev-build/
+node_modules/
+
+# Configuration
+.codelabrc.json
+.prettierrc.yaml
+bunfig.toml
+bun-env.d.ts
+
+# Build artifacts (except dist/)
+*.log
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Test files
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Documentation sources (keep final docs)
+enhanced-code-editor/DEMO.tsx

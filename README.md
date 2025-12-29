@@ -94,9 +94,19 @@ A production-ready, highly customizable code editor with plugin system, custom t
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) >= 1.0.0
+- [Bun](https://bun.sh) >= 1.0.0 (recommended) or [Node.js](https://nodejs.org) >= 18.0.0
 
-### Install from Source
+### Option 1: Install via npm (Recommended)
+
+```bash
+# Install globally
+npm install -g codelab-pro-notepad
+
+# Or use with npx (no installation required)
+npx codelab-pro-notepad
+```
+
+### Option 2: Install from Source
 
 ```bash
 # Clone the repository
@@ -110,13 +120,42 @@ bun install
 
 # Build the project
 bun run build
+
+# Run locally
+bun run start
+# Or use the CLI
+./bin/codelab.js
 ```
 
 ---
 
 ## 🚀 Usage
 
-### Development Mode
+### Quick Start (npm/npx)
+
+If you installed via npm or are using npx:
+
+```bash
+# Using npx (no installation)
+npx codelab-pro-notepad
+
+# Or if installed globally
+codelab
+
+# With custom options
+codelab --port 8080 --theme monokai
+
+# Initialize config file
+codelab init
+
+# View current configuration
+codelab config
+
+# Show help
+codelab help
+```
+
+### Development Mode (Source Installation)
 
 Start the development server with hot module replacement:
 
@@ -126,7 +165,7 @@ bun run dev
 
 Then open your browser to `http://localhost:3000`
 
-### Production Mode
+### Production Mode (Source Installation)
 
 #### Option 1: Using npm scripts
 
@@ -138,7 +177,7 @@ bun run build
 bun run start
 ```
 
-#### Option 2: Using the CLI
+#### Option 2: Using the CLI directly
 
 ```bash
 # Build first

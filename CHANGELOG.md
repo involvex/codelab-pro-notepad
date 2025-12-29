@@ -5,6 +5,25 @@ All notable changes to CodeLab Pro Notepad will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2024-12-29
+
+### Fixed
+- **npm Publishing Issue** - Fixed `npx codelab-pro-notepad` not working due to missing dist files
+- Added `files` field to package.json to explicitly include necessary files in npm package
+- Added `prepublishOnly` script to automatically build before publishing
+- Added `.npmignore` to exclude development files from npm package
+
+### Added
+- **npm Installation Support** - Can now be installed via `npm install -g codelab-pro-notepad`
+- **npx Support** - Can be run directly with `npx codelab-pro-notepad` without installation
+- Package metadata: `main`, `homepage`, `bugs`, and `engines` fields
+- Updated README with npm/npx installation and usage instructions
+
+### Changed
+- Version bumped to 1.0.4
+- Improved documentation for npm users
+- Added Node.js >= 18.0.0 as alternative to Bun
+
 ## [1.0.0] - 2024-12-29
 
 ### Initial Release

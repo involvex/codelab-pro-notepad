@@ -1,7 +1,16 @@
 {
   "name": "codelab-pro-notepad",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Production-ready, extensible code editor with plugin system and custom themes",
+  "main": "dist/index.js",
+  "homepage": "https://github.com/involvex/codelab-pro-notepad#readme",
+  "bugs": {
+    "url": "https://github.com/involvex/codelab-pro-notepad/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/involvex/codelab-pro-notepad.git"
@@ -10,6 +19,19 @@
     "codelab": "bin/codelab.js"
   },
   "type": "module",
+  "files": [
+    "dist",
+    "bin",
+    "scripts",
+    "enhanced-code-editor",
+    "src",
+    ".codelabrc.example.json",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "USAGE.md"
+  ],
   "scripts": {
     "dev": "bun run --hot --watch src/dev-server.tsx",
     "build": "bun run clean && bun run typecheck && bun run build:prod && bun run build:html",
@@ -23,7 +45,8 @@
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist dev-build",
     "preview": "bun run build && bun run start",
-    "prebuild": "bun run format && bun run lint:fix && bun run typecheck"
+    "prebuild": "bun run format && bun run lint:fix && bun run typecheck",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
     "lucide-react": "^0.562.0",
