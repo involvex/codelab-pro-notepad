@@ -3,7 +3,9 @@
     "allow": [
       "Skill(frontend-design)",
       "Bash(bun bin/codelab.js:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

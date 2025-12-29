@@ -9,7 +9,6 @@
   "bin": {
     "codelab": "./bin/codelab.js"
   },
-  "private": true,
   "type": "module",
   "scripts": {
     "dev": "bun run --hot --watch src/dev-server.tsx",
